@@ -1,0 +1,76 @@
+name: 20 Shards Load Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Target URL'
+        required: true
+      duration:
+        description: 'Duration (e.g. 60s)'
+        required: true
+        default: '600'
+      rate_per_shard:
+        description: 'Rate per shard'
+        required: true
+        default: '30'
+      threads:
+        description: 'Threads per shard'
+        required: true
+        default: '5000'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+          cache-dependency-path: go.sum
+      - name: Build
+        run: |
+          mkdir -p bin
+          go build -o bin/tool .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tool-binary
+          path: bin/tool
+
+  load:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: tool-binary
+          path: bin/
+      - run: chmod +x bin/tool
+      - name: Split Proxy
+        env:
+          SHARD_ID: ${{ matrix.shard }}
+        run: |
+          awk -v s="$SHARD_ID" -v t="20" '((NR-1) % t) == (s-1)' proxy.txt > proxy_shard.txt
+          wc -l proxy_shard.txt
+      - name: Run Tool
+        env:
+          TARGET: ${{ inputs.url }}
+          DURATION: ${{ inputs.duration }}
+          RATE: ${{ inputs.rate_per_shard }}
+          THREADS: ${{ inputs.threads }}
+          SHARD_ID: ${{ matrix.shard }}
+        run: |
+          ./bin/tool "$TARGET" "$DURATION" "$RATE" "$THREADS" proxy_shard.txt --http | tee output_shard_$SHARD_ID.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: logs-shard-${{ matrix.shard }}
+          path: output_shard_${{ matrix.shard }}.log
