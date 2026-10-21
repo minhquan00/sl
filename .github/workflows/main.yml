@@ -18,10 +18,6 @@ on:
         description: 'Requests per second per shard'
         required: true
         default: '30'
-      http_mode:
-        description: 'HTTP mode: 1 | 2 | mix'
-        required: true
-        default: 'mix'
       query:
         description: 'Enable --query'
         type: boolean
@@ -99,9 +95,8 @@ jobs:
           R: ${{ inputs.ratelimit }}
           P: ${{ inputs.randpath }}
           I: ${{ inputs.ipspoof }}
-          H: ${{ inputs.http_mode }}
         run: |
-          FLAGS="--http $H"
+          FLAGS=""
           [ "$Q" = "true" ] && FLAGS="$FLAGS --query"
           [ "$B" = "true" ] && FLAGS="$FLAGS --bfm"
           [ "$C" = "true" ] && FLAGS="$FLAGS --cache"
