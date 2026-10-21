@@ -6,42 +6,18 @@ on:
       url:
         description: 'Target URL'
         required: true
-      time:
-        description: 'Duration (e.g. 60s, 600s)'
+      duration:
+        description: 'Duration (e.g. 60s)'
         required: true
-        default: '600s'
+        default: '300'
+      rate_per_shard:
+        description: 'Rate per shard'
+        required: true
+        default: '30'
       threads:
         description: 'Threads per shard'
         required: true
-        default: '5000'
-      rps:
-        description: 'Requests per second per shard'
-        required: true
-        default: '30'
-      query:
-        description: 'Enable --query'
-        type: boolean
-        default: false
-      bfm:
-        description: 'Enable --bfm'
-        type: boolean
-        default: false
-      cache:
-        description: 'Enable --cache'
-        type: boolean
-        default: false
-      ratelimit:
-        description: 'Enable --ratelimit'
-        type: boolean
-        default: false
-      randpath:
-        description: 'Enable --randpath'
-        type: boolean
-        default: false
-      ipspoof:
-        description: 'Enable --ipspoof'
-        type: boolean
-        default: false
+        default: '3000'
 
 jobs:
   build:
@@ -50,7 +26,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.24'
           cache: true
           cache-dependency-path: go.sum
       - name: Build
@@ -78,45 +54,21 @@ jobs:
           name: tool-binary
           path: bin/
       - run: chmod +x bin/tool
-
       - name: Split Proxy
         env:
           SHARD_ID: ${{ matrix.shard }}
         run: |
           awk -v s="$SHARD_ID" -v t="20" '((NR-1) % t) == (s-1)' proxy.txt > proxy_shard.txt
           wc -l proxy_shard.txt
-
-      - name: Build Flags
-        id: flags
-        env:
-          Q: ${{ inputs.query }}
-          B: ${{ inputs.bfm }}
-          C: ${{ inputs.cache }}
-          R: ${{ inputs.ratelimit }}
-          P: ${{ inputs.randpath }}
-          I: ${{ inputs.ipspoof }}
-        run: |
-          FLAGS=""
-          [ "$Q" = "true" ] && FLAGS="$FLAGS --query"
-          [ "$B" = "true" ] && FLAGS="$FLAGS --bfm"
-          [ "$C" = "true" ] && FLAGS="$FLAGS --cache"
-          [ "$R" = "true" ] && FLAGS="$FLAGS --ratelimit"
-          [ "$P" = "true" ] && FLAGS="$FLAGS --randpath"
-          [ "$I" = "true" ] && FLAGS="$FLAGS --ipspoof"
-          echo "FLAGS=$FLAGS" >> "$GITHUB_OUTPUT"
-          echo "Resolved flags: $FLAGS"
-
       - name: Run Tool
         env:
           TARGET: ${{ inputs.url }}
-          DURATION: ${{ inputs.time }}
+          DURATION: ${{ inputs.duration }}
+          RATE: ${{ inputs.rate_per_shard }}
           THREADS: ${{ inputs.threads }}
-          RPS: ${{ inputs.rps }}
           SHARD_ID: ${{ matrix.shard }}
-          FLAGS: ${{ steps.flags.outputs.FLAGS }}
         run: |
-          ./bin/tool "$TARGET" "$DURATION" "$THREADS" proxy_shard.txt "$RPS" $FLAGS | tee output_shard_$SHARD_ID.log
-
+          ./bin/tool "$TARGET" "$DURATION" "$RATE" "$THREADS" proxy_shard.txt --raw | tee output_shard_$SHARD_ID.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
