@@ -68,7 +68,7 @@ jobs:
           THREADS: ${{ inputs.threads }}
           SHARD_ID: ${{ matrix.shard }}
         run: |
-          ./bin/tool "$TARGET" "$DURATION" "$RATE" "$THREADS" proxy_shard.txt --http | tee output_shard_$SHARD_ID.log
+          ./bin/tool "$TARGET" "$DURATION" "$RATE" "$THREADS" proxy_shard.txt | tee output_shard_$SHARD_ID.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
